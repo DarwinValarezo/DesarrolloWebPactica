@@ -6,8 +6,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $usuario = $_POST['username'];
     $password = $_POST['password'];
 
+    // Verificar usuario
     $sql = "SELECT * FROM usuarios WHERE usuario = ?";
     $stmt = $conexion->prepare($sql);
+
+    if (!$stmt) {
+        die("Error al preparar la consulta de usuario: " . $conexion->error);
+    }
+
     $stmt->bind_param("s", $usuario);
     $stmt->execute();
     $resultado = $stmt->get_result();
@@ -16,7 +22,34 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $fila = $resultado->fetch_assoc();
         if (password_verify($password, $fila['contraseña'])) {
             $_SESSION['usuario'] = $fila['usuario'];
-            header("Location: formulario.php");
+            $nombre = $fila['nombre'];
+
+            // Obtener el curso inscrito más reciente
+            $sqlCurso = "SELECT cursos.nombre AS curso
+                         FROM inscritos
+                         JOIN cursos ON cursos.id = inscritos.id_curso
+                         WHERE inscritos.nombre_completo = ?
+                         ORDER BY inscritos.fecha_inscripcion DESC
+                         LIMIT 1";
+            $stmtCurso = $conexion->prepare($sqlCurso);
+
+            if ($stmtCurso) {
+                $stmtCurso->bind_param("s", $nombre);
+                $stmtCurso->execute();
+                $resultadoCurso = $stmtCurso->get_result();
+
+                if ($resultadoCurso->num_rows === 1) {
+                    $curso = $resultadoCurso->fetch_assoc();
+                    $_SESSION['mensaje'] = "🎉 Felicidades <strong>$nombre</strong>, te has inscrito en el curso: <strong>{$curso['curso']}</strong>.";
+                } else {
+                    $_SESSION['mensaje'] = "🎉 Bienvenido <strong>$nombre</strong>, pero aún no te has inscrito en ningún curso.";
+                }
+                $stmtCurso->close();
+            } else {
+                $_SESSION['mensaje'] = "🎉 Bienvenido <strong>$nombre</strong>. No se pudo verificar tu inscripción.";
+            }
+
+            header("Location: index.php");
             exit();
         } else {
             $error = "❌ Contraseña incorrecta.";
@@ -24,38 +57,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } else {
         $error = "❌ Usuario no encontrado.";
     }
+
+    $stmt->close();
 }
 ?>
-
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Iniciar Sesión</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-  <div class="container mt-5">
-    <div class="card p-4 shadow-sm">
-      <h2 class="text-center mb-4">Iniciar Sesión</h2>
-      <form method="POST">
-        <div class="mb-3">
-          <label class="form-label">Usuario</label>
-          <input type="text" name="username" class="form-control" required>
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label">Contraseña</label>
-          <input type="password" name="password" class="form-control" required>
-        </div>
-
-        <button type="submit" class="btn btn-primary w-100">Entrar</button>
-      </form>
-
-      <?php if (isset($error)): ?>
-        <div class="alert alert-danger mt-3"><?= $error ?></div>
-      <?php endif; ?>
-    </div>
-  </div>
-</body>
-</html>
