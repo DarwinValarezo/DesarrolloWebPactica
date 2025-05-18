@@ -1,5 +1,5 @@
 <?php
-require_once 'include/conexion.php';
+require_once 'includes/conexion.php';
 $nombre = $_POST['nombre_completo'];
 $email = $_POST['email'];
 $telefono = $_POST['telefono'];
